@@ -99,7 +99,7 @@ public final class LocationModule: Module {
     AsyncFunction("watchDeviceHeading") { (watchId: Int, options: HeadingOptions) in
       try ensureForegroundLocationPermissions(appContext)
 
-      let locationOptions = LocationOptions(accuracy: .bestForNavigation, distanceInterval: 0)
+      let locationOptions = LocationOptions(accuracy: .lowest, distanceInterval: 1000)
       let streamer = await DeviceHeadingStreamer(options: locationOptions, headingOptions: options)
 
       locationStreamers[watchId] = streamer

@@ -35,6 +35,8 @@ internal class DeviceHeadingStreamer: BaseStreamer {
       if let headingFilter = headingFilter {
         manager.headingFilter = headingFilter <= 0 ? kCLHeadingFilterNone : headingFilter
       }
+      // Core Location needs location updates on this manager to determine true north.
+      manager.startUpdatingLocation()
       manager.startUpdatingHeading()
     }
     headingStream = stream
@@ -43,6 +45,7 @@ internal class DeviceHeadingStreamer: BaseStreamer {
 
   override func stopStreaming() {
     manager.stopUpdatingHeading()
+    manager.stopUpdatingLocation()
     continuation?.finish()
 
     headingStream = nil
@@ -55,9 +58,20 @@ internal class DeviceHeadingStreamer: BaseStreamer {
     continuation?.yield(newHeading)
   }
 
+  func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    // Core Location uses these positions internally to compute true heading.
+  }
+
   func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
-    continuation?.finish(throwing: Exceptions.HeadingUnavailableException().causedBy(error))
-    headingStream = nil
-    continuation = nil
+    switch error {
+    case CLError.locationUnknown, CLError.network:
+      return
+    case CLError.denied where manager.authorizationStatus == .authorizedWhenInUse && CLLocationManager.locationServicesEnabled():
+      // A foreground-only subscription can resume when the app returns to the foreground.
+      return
+    default:
+      continuation?.finish(throwing: Exceptions.HeadingUnavailableException().causedBy(error))
+      stopStreaming()
+    }
   }
 }
